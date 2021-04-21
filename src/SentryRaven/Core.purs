@@ -19,12 +19,12 @@ import Control.Applicative (pure)
 import Control.Bind (bind, (>>=), discard)
 import Effect (Effect)
 import Effect.Uncurried (runEffectFn1, runEffectFn2, runEffectFn3, runEffectFn4)
-import Data.Either (fromRight)
+import Data.Either (Either(..))
 import Data.Function (const, ($))
 import Data.Functor ((<$>))
 import Record.Builder (build, merge)
 import Data.Unit (Unit, unit)
-import Partial.Unsafe (unsafePartial)
+import Partial.Unsafe (unsafeCrashWith)
 import Sentry.Raven.Core.Internal (Raven)
 import Sentry.Raven.Core.Internal as I
 import Simple.JSON (class ReadForeign, read, class WriteForeign, write)
@@ -91,7 +91,9 @@ getContext ∷
   → Effect ctx
 getContext r = do
   ctx ← runEffectFn1 I.getContextImpl r
-  pure $ unsafePartial fromRight (read ctx)
+  pure $ fromRight $ read ctx
+  where fromRight (Right a) = a
+        fromRight _ = unsafeCrashWith "Unexpected Left"
 
 
 -- | Sets current Raven context. Notice that if you want to change the type
@@ -147,7 +149,7 @@ withChangedContext r f action = do
 -- | May change the type of the context.
 withAddedTags ∷
   ∀ h ctx t1 t2 t3 a
-  . Union t2 t1 t3
+  . Union t1 t2 t3
   ⇒ Nub t3 t3
   ⇒ WriteForeign { tags ∷ { | t1 } | ctx}
   ⇒ ReadForeign { tags ∷ { | t1 } | ctx}
@@ -166,7 +168,7 @@ withAddedTags r tags action = do
 -- | May change the type of the context.
 withAddedExtraContext ∷
   ∀ h ctx t1 t2 t3 a
-  . Union t2 t1 t3
+  . Union t1 t2 t3
   ⇒ Nub t3 t3
   ⇒ WriteForeign { extra ∷ { | t1 } | ctx}
   ⇒ ReadForeign { extra ∷ { | t1 } | ctx}
